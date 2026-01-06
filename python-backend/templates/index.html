@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>RAG Chatbot UI</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:20px}
+    .card{border:1px solid #ddd;padding:16px;margin-bottom:12px;border-radius:6px}
+    label{display:block;margin-top:8px}
+    textarea{width:100%;height:80px}
+    pre{background:#f6f8fa;padding:12px;border-radius:6px;white-space:pre-wrap;max-height:300px;overflow-y:auto}
+    button{margin-right:8px;margin-top:8px;padding:6px 12px}
+    .info{background:#e7f3ff;padding:8px;border-radius:4px;font-size:0.9em}
+    input[type="text"]{width:100%;padding:4px}
+    .history-item{border-left:3px solid #0066cc;padding:8px;margin:8px 0;background:#f9f9f9}
+    .history-item.user{border-left-color:#33cc33}
+    .history-item.ai{border-left-color:#ff9900}
+  </style>
+</head>
+<body>
+  <h2>RAG Chatbot - Simple UI with Sessions</h2>
+
+  <div class="card">
+    <strong>Session Management</strong>
+    <div class="info">Session ID: <code id="sessionId">generating...</code></div>
+    <button onclick="generateNewSession()">Generate New Session</button>
+    <button onclick="viewSessionHistory()">View Session History</button>
+    <button onclick="clearSessionHistory()">Clear Session History</button>
+  </div>
+
+  <div class="card">
+    <strong>Quick Endpoints</strong>
+    <div style="margin-top:8px">
+      <button onclick="callRoot()">GET / (root)</button>
+      <button onclick="callHealth()">GET /health</button>
+      <button onclick="callInfo()">GET {{ api_prefix }}/info</button>
+      <button onclick="callReload()">POST {{ api_prefix }}/reload-documents</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <strong>Chat</strong>
+    <label>Query</label>
+    <textarea id="query">What's your dealership hours?</textarea>
+    <label>Additional context (optional)</label>
+    <input id="additional_context" type="text" />
+    <button onclick="sendChat()">Send Chat</button>
+  </div>
+
+  <div class="card">
+    <strong>Response</strong>
+    <pre id="output">No output yet.</pre>
+  </div>
+
+<script>
+  const apiPrefix = '{{ api_prefix }}';
+  
+  // Initialize or restore session ID
+  function initSession(){
+    let sid = localStorage.getItem('sessionId');
+    if(!sid){ sid = generateUUID(); }
+    localStorage.setItem('sessionId', sid);
+    document.getElementById('sessionId').textContent = sid;
+  }
+  
+  function generateUUID(){
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c){
+      const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
+      return v.toString(16);
+    });
+  }
+  
+  function getSessionId(){
+    return localStorage.getItem('sessionId') || '';
+  }
+  
+  function generateNewSession(){
+    const newId = generateUUID();
+    localStorage.setItem('sessionId', newId);
+    document.getElementById('sessionId').textContent = newId;
+    show('New session created: ' + newId);
+  }
+
+  function show(obj){
+    const el = document.getElementById('output');
+    try{ el.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2); }
+    catch(e){ el.textContent = String(obj); }
+  }
+
+  async function callRoot(){
+    try{
+      const r = await fetch('/');
+      show(await r.json());
+    }catch(e){ show('Error: ' + e.message); }
+  }
+
+  async function callHealth(){
+    try{
+      const r = await fetch('/health');
+      show(await r.json());
+    }catch(e){ show('Error: ' + e.message); }
+  }
+
+  async function callInfo(){
+    try{
+      const r = await fetch(`${apiPrefix}/info`);
+      show(await r.json());
+    }catch(e){ show('Error: ' + e.message); }
+  }
+
+  async function callReload(){
+    try{
+      const r = await fetch(`${apiPrefix}/reload-documents`, { method: 'POST' });
+      show(await r.json());
+    }catch(e){ show('Error: ' + e.message); }
+  }
+
+  async function sendChat(){
+    const q = document.getElementById('query').value;
+    const additional = document.getElementById('additional_context').value || null;
+    const sid = getSessionId();
+    const body = { query: q, session_id: sid, additional_context: additional };
+    try{
+      const r = await fetch(`${apiPrefix}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const txt = await r.text();
+      try{ show(JSON.parse(txt)); }catch(e){ show(txt); }
+    }catch(e){ show('Error: ' + e.message); }
+  }
+
+  async function viewSessionHistory(){
+    const sid = getSessionId();
+    try{
+      const r = await fetch(`${apiPrefix}/session/${sid}/history`);
+      const data = await r.json();
+      let html = `<strong>Session: ${data.session_id}</strong>\n`;
+      html += `Messages: ${data.message_count}\n\n`;
+      if(data.history && data.history.length > 0){
+        data.history.forEach(msg => {
+          const role = msg.role === 'HumanMessage' ? 'USER' : 'AI';
+          const cls = role === 'USER' ? 'user' : 'ai';
+          html += `[${role}] ${msg.content}\n\n`;
+        });
+      }else{
+        html += 'No messages yet.';
+      }
+      show(html);
+    }catch(e){ show('Error: ' + e.message); }
+  }
+
+  async function clearSessionHistory(){
+    const sid = getSessionId();
+    try{
+      const r = await fetch(`${apiPrefix}/session/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sid })
+      });
+      show(await r.json());
+    }catch(e){ show('Error: ' + e.message); }
+  }
+
+  // Initialize on page load
+  window.addEventListener('load', initSession);
+</script>
+</body>
+</html>

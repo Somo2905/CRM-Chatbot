@@ -1,23 +1,20 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, EyeOff, Car, Mail, Lock, User, Building, Phone } from 'lucide-react';
+import { Eye, EyeOff, Car, User, Phone, CreditCard } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { authService } from '../services';
 
 export function SignupPage({ onSignup }) {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
+    name: '',
     phone: '',
-    dealership: '',
-    password: '',
-    confirmPassword: ''
+    dlLast4: ''
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showDlLast4, setShowDlLast4] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -28,13 +25,17 @@ export function SignupPage({ onSignup }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await authService.signup(formData);
       onSignup();
-    }, 1000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -124,48 +125,22 @@ export function SignupPage({ onSignup }) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <Input
-                    id="firstName"
-                    name="firstName"
-                    type="text"
-                    placeholder="John"
-                    value={formData.firstName}
-                    onChange={handleChange}
-                    className="pl-10"
-                    required
-                  />
-                </div>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  type="text"
-                  placeholder="Doe"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
-            </div>
-
+            )}
+            
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="name">Full Name</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="john.doe@dealership.com"
-                  value={formData.email}
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={formData.name}
                   onChange={handleChange}
                   className="pl-10"
                   required
@@ -191,42 +166,26 @@ export function SignupPage({ onSignup }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dealership">Dealership Name</Label>
+              <Label htmlFor="dlLast4">Driver's License (Last 4 Digits)</Label>
               <div className="relative">
-                <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
-                  id="dealership"
-                  name="dealership"
-                  type="text"
-                  placeholder="ABC Motors"
-                  value={formData.dealership}
+                  id="dlLast4"
+                  name="dlLast4"
+                  type={showDlLast4 ? 'text' : 'password'}
+                  placeholder="****"
+                  value={formData.dlLast4}
                   onChange={handleChange}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Create a strong password"
-                  value={formData.password}
-                  onChange={handleChange}
+                  maxLength={4}
                   className="pl-10 pr-10"
                   required
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowDlLast4(!showDlLast4)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? (
+                  {showDlLast4 ? (
                     <EyeOff className="h-5 w-5" />
                   ) : (
                     <Eye className="h-5 w-5" />
@@ -236,46 +195,22 @@ export function SignupPage({ onSignup }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  className="pl-10 pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2">
-              <input
-                type="checkbox"
-                id="terms"
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1"
-                required
-              />
-              <label htmlFor="terms" className="text-sm text-gray-600">
-                I agree to the{' '}
-                <a href="#" className="text-blue-600 hover:text-blue-700">Terms of Service</a>
-                {' '}and{' '}
-                <a href="#" className="text-blue-600 hover:text-blue-700">Privacy Policy</a>
-              </label>
+              <Label htmlFor="terms">
+                <div className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1"
+                    required
+                  />
+                  <span className="text-sm text-gray-600">
+                    I agree to the{' '}
+                    <a href="#" className="text-blue-600 hover:text-blue-700">Terms of Service</a>
+                    {' '}and{' '}
+                    <a href="#" className="text-blue-600 hover:text-blue-700">Privacy Policy</a>
+                  </span>
+                </div>
+              </Label>
             </div>
 
             <Button

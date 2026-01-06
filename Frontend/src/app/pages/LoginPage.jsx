@@ -1,25 +1,31 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, EyeOff, Car, Mail, Lock } from 'lucide-react';
+import { Eye, EyeOff, Car, Phone, CreditCard } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { authService } from '../services';
 
 export function LoginPage({ onLogin }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [dlLast4, setDlLast4] = useState('');
+  const [showDlLast4, setShowDlLast4] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await authService.login({ phone, dlLast4 });
       onLogin();
-    }, 1000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -88,16 +94,22 @@ export function LoginPage({ onLogin }) {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+            
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="phone">Phone Number</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="your.email@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="phone"
+                  type="tel"
+                  placeholder="(555) 123-4567"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   className="pl-10"
                   required
                 />
@@ -106,28 +118,26 @@ export function LoginPage({ onLogin }) {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700">
-                  Forgot password?
-                </Link>
+                <Label htmlFor="dlLast4">Driver's License (Last 4 Digits)</Label>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  id="dlLast4"
+                  type={showDlLast4 ? 'text' : 'password'}
+                  placeholder="****"
+                  value={dlLast4}
+                  onChange={(e) => setDlLast4(e.target.value)}
+                  maxLength={4}
                   className="pl-10 pr-10"
                   required
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
+                  onClick={() => setShowDlLast4(!showDlLast4)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showPassword ? (
+                  {showDlLast4 ? (
                     <EyeOff className="h-5 w-5" />
                   ) : (
                     <Eye className="h-5 w-5" />

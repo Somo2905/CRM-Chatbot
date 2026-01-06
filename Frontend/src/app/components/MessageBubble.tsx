@@ -67,9 +67,16 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </div>
         )}
 
-        <span className="text-xs text-gray-400 px-2">
-          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </span>
+        <div className="flex items-center gap-2 text-xs text-gray-400 px-2">
+          <span>
+            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          {message.metadata && isBot && (
+            <span className="text-[10px] text-gray-400">
+              • Memory: {message.metadata.memory_size} msgs
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChatHeader } from './ChatHeader';
 import { ChatMessages } from './ChatMessages';
 import { ChatInput } from './ChatInput';
 import { ChatSidebar } from './ChatSidebar';
 import { Message, ConversationThread } from '../types/chat';
+import { 
+  authService, 
+  conversationService, 
+  nodeChatService,
+  pythonChatService 
+} from '../services';
 
 export function ChatbotContainer() {
   const [messages, setMessages] = useState<Message[]>([
@@ -32,8 +38,30 @@ export function ChatbotContainer() {
   ]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
 
-  const handleSendMessage = (text: string) => {
+  // Initialize conversation on mount if user is authenticated
+  useEffect(() => {
+    const initConversation = async () => {
+      if (authService.isAuthenticated()) {
+        try {
+          const existingConvId = conversationService.getCurrentConversationId();
+          if (existingConvId) {
+            setConversationId(existingConvId);
+          } else {
+            const response = await conversationService.startConversation();
+            setConversationId(response.conversationId);
+          }
+        } catch (error) {
+          console.error('Failed to initialize conversation:', error);
+        }
+      }
+    };
+    initConversation();
+  }, []);
+
+  const handleSendMessage = async (text: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
       text,
@@ -42,15 +70,102 @@ export function ChatbotContainer() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
 
-    // Simulate bot response
-    setTimeout(() => {
-      const botResponse = generateBotResponse(text);
+    try {
+      // Determine which backend to use based on query type and authentication
+      const isAuthenticated = authService.isAuthenticated();
+      const lowerText = text.toLowerCase();
+      
+      // Check if this is an action query (book, schedule, appointment)
+      const isActionQuery = lowerText.includes('book') || 
+                           lowerText.includes('schedule') || 
+                           lowerText.includes('appointment');
+
+      let botResponse: Message;
+
+      if (isAuthenticated && isActionQuery && conversationId) {
+        // Use Node.js backend for action-based queries
+        const response = await nodeChatService.sendMessage({
+          conversationId,
+          message: text
+        });
+
+        botResponse = {
+          id: Date.now().toString(),
+          text: response.reply,
+          sender: 'bot',
+          timestamp: new Date(),
+          data: response.data
+        };
+      } else {
+        // Use Python RAG backend for informational queries
+        const customerInfo = authService.getCustomerInfo();
+        const sessionId = pythonChatService.getSessionId();
+        
+        console.log('Sending to Python RAG with session ID:', sessionId);
+        
+        const response = await pythonChatService.sendMessage({
+          query: text,
+          session_id: sessionId,
+          user_data: customerInfo ? {
+            customer_id: customerInfo.id,
+            name: customerInfo.name
+          } : undefined
+        });
+
+        console.log('Response from Python RAG:', {
+          session_id: response.session_id,
+          memory_size: response.memory_size,
+          context_used: response.context_used
+        });
+
+        botResponse = {
+          id: Date.now().toString(),
+          text: response.response,
+          sender: 'bot',
+          timestamp: new Date(),
+          suggestions: generateSuggestions(text),
+          metadata: {
+            session_id: response.session_id,
+            memory_size: response.memory_size,
+            context_used: response.context_used
+          }
+        };
+      }
+
       setMessages(prev => [...prev, botResponse]);
-    }, 1000);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        text: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const generateSuggestions = (userMessage: string): string[] => {
+    const lowerMessage = userMessage.toLowerCase();
+    
+    if (lowerMessage.includes('vehicle') || lowerMessage.includes('car')) {
+      return ['Get vehicle details', 'Schedule test drive', 'Compare vehicles'];
+    } else if (lowerMessage.includes('service') || lowerMessage.includes('appointment')) {
+      return ['Book appointment', 'View service history', 'Contact service center'];
+    } else if (lowerMessage.includes('customer') || lowerMessage.includes('profile')) {
+      return ['View purchase history', 'Update contact info', 'Loyalty rewards'];
+    }
+    return ['Search vehicles', 'Book service', 'View my profile', 'Contact sales'];
   };
 
   const generateBotResponse = (userMessage: string): Message => {
+    // This function is now deprecated but kept for fallback
     const lowerMessage = userMessage.toLowerCase();
     
     let responseText = '';
@@ -145,34 +260,51 @@ export function ChatbotContainer() {
     };
   };
 
-  const handleNewConversation = () => {
-    const newConv: ConversationThread = {
-      id: Date.now().toString(),
-      title: 'New Conversation',
-      lastMessage: 'Started new conversation',
-      timestamp: new Date(),
-      isActive: true
-    };
-
-    setConversations(prev => [
-      newConv,
-      ...prev.map(c => ({ ...c, isActive: false }))
-    ]);
-
-    setMessages([
-      {
-        id: Date.now().toString(),
-        text: "Hello! I'm your Automotive Assistant. How can I help you today?",
-        sender: 'bot',
-        timestamp: new Date(),
-        suggestions: [
-          'Search for vehicles',
-          'Schedule a service',
-          'Check inventory',
-          'Customer information'
-        ]
+  const handleNewConversation = async () => {
+    try {
+      let newConvId: string;
+      
+      if (authService.isAuthenticated()) {
+        // Start new conversation in Node.js backend
+        const response = await conversationService.startConversation();
+        newConvId = response.conversationId;
+        setConversationId(newConvId);
+      } else {
+        // Clear Python session for non-authenticated users
+        pythonChatService.clearCurrentSession();
+        newConvId = Date.now().toString();
       }
-    ]);
+
+      const newConv: ConversationThread = {
+        id: newConvId,
+        title: 'New Conversation',
+        lastMessage: 'Started new conversation',
+        timestamp: new Date(),
+        isActive: true
+      };
+
+      setConversations(prev => [
+        newConv,
+        ...prev.map(c => ({ ...c, isActive: false }))
+      ]);
+
+      setMessages([
+        {
+          id: Date.now().toString(),
+          text: "Hello! I'm your Automotive Assistant. How can I help you today?",
+          sender: 'bot',
+          timestamp: new Date(),
+          suggestions: [
+            'Search for vehicles',
+            'Schedule a service',
+            'Check inventory',
+            'Customer information'
+          ]
+        }
+      ]);
+    } catch (error) {
+      console.error('Failed to start new conversation:', error);
+    }
   };
 
   const handleSelectConversation = (conversationId: string) => {

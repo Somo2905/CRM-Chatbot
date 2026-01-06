@@ -5,6 +5,11 @@ export interface Message {
   timestamp: Date;
   suggestions?: string[];
   data?: any;
+  metadata?: {
+    session_id?: string;
+    memory_size?: number;
+    context_used?: number;
+  };
 }
 
 export interface ConversationThread {
