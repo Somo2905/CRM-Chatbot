@@ -159,6 +159,7 @@ export const conversationService = {
    */
   async startConversation(): Promise<StartConversationResponse> {
     try {
+      console.log('Starting conversation with backend...');
       const response = await fetch(`${BASE_URL}${ENDPOINTS.CONVERSATIONS.START}`, {
         method: 'POST',
         headers: {
@@ -173,14 +174,19 @@ export const conversationService = {
       }
 
       const data = await response.json();
+      console.log('Conversation started, received:', data);
       
       // Store conversation ID
       if (data.conversationId) {
+        console.log('Storing conversationId in localStorage:', data.conversationId);
         localStorage.setItem('conversationId', data.conversationId);
+      } else {
+        console.error('No conversationId in response:', data);
       }
 
       return data;
     } catch (error) {
+      console.error('Error starting conversation:', error);
       throw new Error(handleApiError(error));
     }
   },
@@ -189,7 +195,9 @@ export const conversationService = {
    * Get current conversation ID
    */
   getCurrentConversationId(): string | null {
-    return localStorage.getItem('conversationId');
+    const convId = localStorage.getItem('conversationId');
+    console.log('Retrieved conversationId from localStorage:', convId);
+    return convId;
   },
 };
 
@@ -215,6 +223,118 @@ export const nodeChatService = {
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || 'Failed to send message');
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+};
+
+// ============================================================================
+// Generic API Service for Management Pages
+// ============================================================================
+
+export const nodeBackendService = {
+  /**
+   * Generic GET request
+   */
+  async get(endpoint: string): Promise<any> {
+    try {
+      // Ensure endpoint starts with /api if not already present
+      const url = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+      const response = await fetch(`${BASE_URL}${url}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Request failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
+   * Generic POST request
+   */
+  async post(endpoint: string, data: any): Promise<any> {
+    try {
+      // Ensure endpoint starts with /api if not already present
+      const url = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+      const response = await fetch(`${BASE_URL}${url}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Request failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
+   * Generic PUT request
+   */
+  async put(endpoint: string, data: any): Promise<any> {
+    try {
+      // Ensure endpoint starts with /api if not already present
+      const url = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+      const response = await fetch(`${BASE_URL}${url}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Request failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  },
+
+  /**
+   * Generic DELETE request
+   */
+  async delete(endpoint: string): Promise<any> {
+    try {
+      // Ensure endpoint starts with /api if not already present
+      const url = endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
+      const response = await fetch(`${BASE_URL}${url}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Request failed');
       }
 
       return await response.json();

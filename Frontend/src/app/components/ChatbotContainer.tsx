@@ -47,14 +47,27 @@ export function ChatbotContainer() {
       if (authService.isAuthenticated()) {
         try {
           const existingConvId = conversationService.getCurrentConversationId();
+          console.log('Existing conversation ID:', existingConvId);
+          
           if (existingConvId) {
             setConversationId(existingConvId);
+            console.log('Using existing conversation:', existingConvId);
           } else {
+            console.log('Starting new conversation...');
             const response = await conversationService.startConversation();
+            console.log('Started new conversation:', response.conversationId);
             setConversationId(response.conversationId);
           }
         } catch (error) {
           console.error('Failed to initialize conversation:', error);
+          // Try to start a new conversation as fallback
+          try {
+            const response = await conversationService.startConversation();
+            setConversationId(response.conversationId);
+            console.log('Fallback conversation started:', response.conversationId);
+          } catch (fallbackError) {
+            console.error('Fallback conversation start also failed:', fallbackError);
+          }
         }
       }
     };
@@ -86,6 +99,13 @@ export function ChatbotContainer() {
 
       if (isAuthenticated && isActionQuery && conversationId) {
         // Use Node.js backend for action-based queries
+        console.log('Sending action query to Node backend:', {
+          conversationId,
+          message: text,
+          isAuthenticated,
+          isActionQuery
+        });
+        
         const response = await nodeChatService.sendMessage({
           conversationId,
           message: text
